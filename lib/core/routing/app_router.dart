@@ -8,10 +8,33 @@ import '../../features/recording/presentation/screens/record_screen.dart';
 import '../../features/timeline/presentation/screens/timeline_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../shared/presentation/screens/splash_screen.dart';
+import '../../features/auth/data/providers/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final authState = ref.watch(authStateProvider);
+  
   return GoRouter(
     initialLocation: AppConstants.splashRoute,
+    redirect: (context, state) {
+      final isAuthenticated = ref.read(isAuthenticatedProvider);
+      final isSplashScreen = state.matchedLocation == AppConstants.splashRoute;
+      final isLoginScreen = state.matchedLocation == AppConstants.loginRoute;
+      
+      // If on splash screen, let it handle the redirect
+      if (isSplashScreen) return null;
+      
+      // If not authenticated and not on login screen, redirect to login
+      if (!isAuthenticated && !isLoginScreen) {
+        return AppConstants.loginRoute;
+      }
+      
+      // If authenticated and on login screen, redirect to home
+      if (isAuthenticated && isLoginScreen) {
+        return AppConstants.homeRoute;
+      }
+      
+      return null;
+    },
     routes: [
       GoRoute(
         path: AppConstants.splashRoute,
