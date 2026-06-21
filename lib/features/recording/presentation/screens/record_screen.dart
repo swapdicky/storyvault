@@ -2,16 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/presentation/widgets/bottom_navigation.dart';
 import '../providers/recording_providers.dart';
+import '../../../story/presentation/providers/story_providers.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 
-class RecordScreen extends ConsumerWidget {
+class RecordScreen extends ConsumerStatefulWidget {
   const RecordScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RecordScreen> createState() => _RecordScreenState();
+}
+
+class _RecordScreenState extends ConsumerState<RecordScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load user stories from cloud
+    final userId = ref.read(currentUserIdProvider);
+    if (userId != null) {
+      ref.read(storyNotifierProvider.notifier).loadUserStories(userId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isRecording = ref.watch(isRecordingProvider);
     final isPaused = ref.watch(isPausedProvider);
-    final recordings = ref.watch(recordingsProvider);
-    final errorMessage = ref.watch(recordingErrorProvider);
+    final stories = ref.watch(storiesProvider);
+    final isUploading = ref.watch(storyUploadingProvider);
+    final errorMessage = ref.watch(recordingErrorProvider) ?? ref.watch(storyErrorProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -53,51 +71,60 @@ class RecordScreen extends ConsumerWidget {
                       ),
                     ),
                   const SizedBox(height: 48),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (isRecording)
-                        IconButton(
-                          onPressed: () {
-                            if (isPaused) {
-                              ref.read(recordingNotifierProvider.notifier).resumeRecording();
+                  if (isUploading)
+                    const Column(
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Uploading to cloud...'),
+                      ],
+                    )
+                  else
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (isRecording)
+                          IconButton(
+                            onPressed: () {
+                              if (isPaused) {
+                                ref.read(recordingNotifierProvider.notifier).resumeRecording();
+                              } else {
+                                ref.read(recordingNotifierProvider.notifier).pauseRecording();
+                              }
+                            },
+                            icon: Icon(
+                              isPaused ? Icons.play_arrow : Icons.pause,
+                              size: 48,
+                            ),
+                          ),
+                        const SizedBox(width: 16),
+                        FloatingActionButton(
+                          onPressed: isUploading ? null : () {
+                            if (isRecording) {
+                              ref.read(recordingNotifierProvider.notifier).stopRecording();
                             } else {
-                              ref.read(recordingNotifierProvider.notifier).pauseRecording();
+                              ref.read(recordingNotifierProvider.notifier).startRecording();
                             }
                           },
-                          icon: Icon(
-                            isPaused ? Icons.play_arrow : Icons.pause,
-                            size: 48,
+                          child: Icon(
+                            isRecording ? Icons.stop : Icons.mic,
                           ),
+                          mini: false,
+                          backgroundColor: isRecording ? Colors.red : null,
                         ),
-                      const SizedBox(width: 16),
-                      FloatingActionButton(
-                        onPressed: () {
-                          if (isRecording) {
-                            ref.read(recordingNotifierProvider.notifier).stopRecording();
-                          } else {
-                            ref.read(recordingNotifierProvider.notifier).startRecording();
-                          }
-                        },
-                        child: Icon(
-                          isRecording ? Icons.stop : Icons.mic,
-                        ),
-                        mini: false,
-                        backgroundColor: isRecording ? Colors.red : null,
-                      ),
-                      const SizedBox(width: 16),
-                      if (isRecording)
-                        IconButton(
-                          onPressed: () {
-                            ref.read(recordingNotifierProvider.notifier).stopRecording();
-                          },
-                          icon: const Icon(
-                            Icons.stop,
-                            size: 48,
+                        const SizedBox(width: 16),
+                        if (isRecording)
+                          IconButton(
+                            onPressed: () {
+                              ref.read(recordingNotifierProvider.notifier).stopRecording();
+                            },
+                            icon: const Icon(
+                              Icons.stop,
+                              size: 48,
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -116,26 +143,26 @@ class RecordScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   Expanded(
-                    child: recordings.isEmpty
+                    child: stories.isEmpty
                         ? Center(
                             child: Text(
-                              'No recordings yet',
+                              'No stories yet',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                   ),
                             ),
                           )
                         : ListView.builder(
-                            itemCount: recordings.length,
+                            itemCount: stories.length,
                             itemBuilder: (context, index) {
-                              final recording = recordings[index];
-                              return RecordingListItem(
-                                recording: recording,
+                              final story = stories[index];
+                              return StoryListItem(
+                                story: story,
                                 onPlay: () {
-                                  ref.read(recordingNotifierProvider.notifier).playRecording(recording.filePath);
+                                  ref.read(recordingNotifierProvider.notifier).playRecording(story.audioPath);
                                 },
                                 onDelete: () {
-                                  ref.read(recordingNotifierProvider.notifier).deleteRecording(recording.id);
+                                  ref.read(storyNotifierProvider.notifier).deleteStory(story.id);
                                 },
                               );
                             },
@@ -152,14 +179,14 @@ class RecordScreen extends ConsumerWidget {
   }
 }
 
-class RecordingListItem extends ConsumerWidget {
-  final dynamic recording;
+class StoryListItem extends ConsumerWidget {
+  final dynamic story;
   final VoidCallback onPlay;
   final VoidCallback onDelete;
 
-  const RecordingListItem({
+  const StoryListItem({
     super.key,
-    required this.recording,
+    required this.story,
     required this.onPlay,
     required this.onDelete,
   });
@@ -167,6 +194,7 @@ class RecordingListItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isPlaying = ref.watch(isPlayingProvider);
+    final isDeleting = ref.watch(storyDeletingProvider);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -175,11 +203,11 @@ class RecordingListItem extends ConsumerWidget {
           child: Icon(Icons.audio_file),
         ),
         title: Text(
-          recording.fileName,
+          story.title ?? 'Untitled Story',
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '${recording.duration}s • ${_formatDate(recording.createdAt)}',
+          '${story.duration}s • ${_formatDate(story.createdAt)}',
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -189,8 +217,14 @@ class RecordingListItem extends ConsumerWidget {
               onPressed: onPlay,
             ),
             IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: onDelete,
+              icon: isDeleting 
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete),
+              onPressed: isDeleting ? null : onDelete,
               color: Theme.of(context).colorScheme.error,
             ),
           ],

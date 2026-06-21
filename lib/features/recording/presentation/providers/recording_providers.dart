@@ -3,15 +3,26 @@ import '../../data/repositories/recording_repository_impl.dart';
 import '../../domain/repositories/recording_repository.dart';
 import '../../domain/entities/recording.dart';
 import '../notifiers/recording_notifier.dart';
+import '../../../story/data/repositories/story_repository_impl.dart';
+import '../../../story/domain/repositories/story_repository.dart';
 
 // Recording Repository Provider
 final recordingRepositoryProvider = Provider<RecordingRepository>((ref) {
   return RecordingRepositoryImpl();
 });
 
+// Story Repository Provider
+final storyRepositoryForRecordingProvider = Provider<StoryRepository>((ref) {
+  return StoryRepositoryImpl();
+});
+
 // Recording Notifier Provider
 final recordingNotifierProvider = StateNotifierProvider<RecordingNotifier, RecordingState>((ref) {
-  return RecordingNotifier(ref.watch(recordingRepositoryProvider));
+  return RecordingNotifier(
+    ref.watch(recordingRepositoryProvider),
+    ref.watch(storyRepositoryForRecordingProvider),
+    ref,
+  );
 });
 
 // Convenience providers

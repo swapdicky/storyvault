@@ -1,11 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/recording.dart';
 import '../../domain/repositories/recording_repository.dart';
+import '../../../story/domain/repositories/story_repository.dart';
+import '../../../story/presentation/providers/story_providers.dart';
+import '../../../auth/presentation/providers/auth_providers.dart' show currentUserIdProvider;
 
 class RecordingNotifier extends StateNotifier<RecordingState> {
   final RecordingRepository _recordingRepository;
+  final StoryRepository _storyRepository;
+  final Ref _ref;
 
-  RecordingNotifier(this._recordingRepository) : super(const RecordingState()) {
+  RecordingNotifier(
+    this._recordingRepository,
+    this._storyRepository,
+    this._ref,
+  ) : super(const RecordingState()) {
     _loadRecordings();
   }
 
@@ -82,6 +91,16 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         );
       },
       (recording) async {
+        // Upload to cloud
+        final userId = _ref.read(currentUserIdProvider);
+        if (userId != null) {
+          await _ref.read(storyNotifierProvider.notifier).uploadStory(
+            userId: userId,
+            localFilePath: recording.filePath,
+            duration: recording.duration,
+          );
+        }
+        
         final updatedRecordings = [recording, ...state.recordings];
         state = state.copyWith(
           isRecording: false,
