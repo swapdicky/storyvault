@@ -4,8 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../shared/presentation/widgets/bottom_navigation.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../auth/data/providers/auth_provider.dart';
-import '../../../auth/data/services/auth_service.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -13,7 +12,8 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
-    final user = ref.watch(currentUserProvider);
+    final email = ref.watch(currentUserEmailProvider);
+    final isLoading = ref.watch(authLoadingProvider);
     
     return Scaffold(
       appBar: AppBar(
@@ -34,9 +34,9 @@ class ProfileScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
-            if (user != null)
+            if (email != null)
               Text(
-                user.email ?? 'No email',
+                email,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                     ),
@@ -54,24 +54,21 @@ class ProfileScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  try {
-                    final authService = ref.read(authServiceProvider);
-                    await authService.signOut();
-                    if (context.mounted) {
-                      context.go(AppConstants.loginRoute);
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Logout failed: $e'),
-                        ),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.logout),
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        await ref.read(authNotifierProvider.notifier).signOut();
+                        if (context.mounted) {
+                          context.go(AppConstants.loginRoute);
+                        }
+                      },
+                icon: isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.logout),
                 label: const Text('Logout'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Theme.of(context).colorScheme.error,

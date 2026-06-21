@@ -8,11 +8,9 @@ import '../../features/recording/presentation/screens/record_screen.dart';
 import '../../features/timeline/presentation/screens/timeline_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../shared/presentation/screens/splash_screen.dart';
-import '../../features/auth/data/providers/auth_provider.dart';
+import '../../features/auth/presentation/providers/auth_providers.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-  
   return GoRouter(
     initialLocation: AppConstants.splashRoute,
     redirect: (context, state) {

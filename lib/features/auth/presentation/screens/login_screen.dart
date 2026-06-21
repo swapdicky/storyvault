@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../data/providers/auth_provider.dart';
-import '../../data/services/auth_service.dart';
+import '../providers/auth_providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -17,8 +16,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLogin = true;
-  bool _isLoading = false;
-  String? _errorMessage;
 
   @override
   void dispose() {
@@ -30,70 +27,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    ref.read(authNotifierProvider.notifier).clearError();
 
-    try {
-      final authService = ref.read(authServiceProvider);
-      
-      if (_isLogin) {
-        await authService.signInWithEmail(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-      } else {
-        await authService.signUpWithEmail(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-      }
-      
-      if (mounted) {
-        context.go(AppConstants.homeRoute);
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    if (_isLogin) {
+      await ref.read(authNotifierProvider.notifier).signInWithEmail(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+    } else {
+      await ref.read(authNotifierProvider.notifier).signUpWithEmail(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+    }
+
+    if (mounted && ref.read(isAuthenticatedProvider)) {
+      context.go(AppConstants.homeRoute);
     }
   }
 
   Future<void> _signInWithApple() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    ref.read(authNotifierProvider.notifier).clearError();
+    await ref.read(authNotifierProvider.notifier).signInWithApple();
 
-    try {
-      final authService = ref.read(authServiceProvider);
-      await authService.signInWithApple();
-      
-      if (mounted) {
-        context.go(AppConstants.homeRoute);
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    if (mounted && ref.read(isAuthenticatedProvider)) {
+      context.go(AppConstants.homeRoute);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = ref.watch(authLoadingProvider);
+    final errorMessage = ref.watch(authErrorProvider);
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -166,11 +132,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                if (_errorMessage != null)
+                if (errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Text(
-                      _errorMessage!,
+                      errorMessage!,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
@@ -178,8 +144,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _submit,
-                  child: _isLoading
+                  onPressed: isLoading ? null : _submit,
+                  child: isLoading
                       ? const SizedBox(
                           height: 20,
                           width: 20,
@@ -189,19 +155,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithApple,
+                  onPressed: isLoading ? null : _signInWithApple,
                   icon: const Icon(Icons.apple),
                   label: const Text('Sign in with Apple'),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: _isLoading
+                  onPressed: isLoading
                       ? null
                       : () {
                           setState(() {
                             _isLogin = !_isLogin;
-                            _errorMessage = null;
                           });
+                          ref.read(authNotifierProvider.notifier).clearError();
                         },
                   child: Text(_isLogin
                       ? 'Create an account'
