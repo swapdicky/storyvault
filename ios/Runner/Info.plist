@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>We use your data to improve your experience</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to the microphone to record your voice stories</string>
 </dict>
 </plist>

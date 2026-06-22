@@ -34,17 +34,48 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  
+  # State Management
+  flutter_riverpod: ^2.4.9
+  
+  # Routing
+  go_router: ^13.0.0
+  
+  # Local Storage
+  shared_preferences: ^2.2.2
+  
+  # Supabase
+  supabase_flutter: ^2.3.3
+  
+  # Apple Sign In
+  sign_in_with_apple: ^6.1.0
+  
+  # Functional Programming
+  dartz: ^0.10.1
+  
+  # Value Equality
+  equatable: ^2.0.5
+  
+  # Audio Recording
+  record: ^4.4.4
+  audioplayers: ^5.2.1
+  path_provider: ^2.1.1
+  permission_handler: ^11.0.1
+  audio_waveforms: ^2.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
+  # encourage good coding practices. the lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+dependency_overrides:
+  device_info_plus: ^9.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
