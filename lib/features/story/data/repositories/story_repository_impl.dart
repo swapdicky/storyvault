@@ -79,13 +79,14 @@ class StoryRepositoryImpl implements StoryRepository {
     try {
       final response = await _supabase
           .from('stories')
-          .select('*, tags(name)')
+          .select('*, story_tags(tags(name))')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
       final stories = response.map<Story>((data) {
-        final tagNames = (data['tags'] as List<dynamic>?)
-            ?.map((tag) => tag['name'] as String)
+        final tagNames = (data['story_tags'] as List<dynamic>?)
+            ?.map((st) => st['tags'] as Map<String, dynamic>)
+            .map((tag) => tag['name'] as String)
             .toList() ?? [];
 
         return Story(
