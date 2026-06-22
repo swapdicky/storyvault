@@ -3,6 +3,8 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
+import 'package:audioplayers_platform_interface/audioplayers_platform_interface.dart' as ap_interface;
 import 'dart:io';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/failures.dart';
@@ -10,34 +12,48 @@ import '../../domain/entities/recording.dart';
 import '../../domain/repositories/recording_repository.dart';
 
 class RecordingRepositoryImpl implements RecordingRepository {
-  final Record _audioRecorder;
   final AudioPlayer _audioPlayer;
   final Uuid _uuid;
+  final Record _audioRecorder;
+  RecorderController? _recorderController;
 
   String? _currentRecordingPath;
   DateTime? _recordingStartTime;
+  Function()? _onPlaybackComplete;
 
   RecordingRepositoryImpl({
-    Record? audioRecorder,
     AudioPlayer? audioPlayer,
     Uuid? uuid,
-  })  : _audioRecorder = audioRecorder ?? Record(),
-        _audioPlayer = audioPlayer ?? AudioPlayer(),
-        _uuid = uuid ?? const Uuid();
+    RecorderController? recorderController,
+    Record? audioRecorder,
+  })  : _audioPlayer = audioPlayer ?? AudioPlayer(),
+        _uuid = uuid ?? const Uuid(),
+        _recorderController = recorderController,
+        _audioRecorder = audioRecorder ?? Record() {
+    _audioPlayer.onPlayerComplete.listen((_) {
+      _onPlaybackComplete?.call();
+    });
+  }
+
+  void setRecorderController(RecorderController controller) {
+    _recorderController = controller;
+  }
 
   @override
   Future<Either<Failure, void>> startRecording() async {
     try {
-      // Request microphone permission
-      final status = await Permission.microphone.request();
-      if (!status.isGranted) {
-        return const Left(PermissionFailure('Microphone permission denied'));
+      // Request microphone permission (only on mobile platforms)
+      if (Platform.isIOS || Platform.isAndroid) {
+        final status = await Permission.microphone.request();
+        if (!status.isGranted) {
+          return const Left(PermissionFailure('Microphone permission denied'));
+        }
       }
 
       // Get app directory
       final directory = await getApplicationDocumentsDirectory();
       final recordingsDir = Directory('${directory.path}/recordings');
-      
+
       if (!await recordingsDir.exists()) {
         await recordingsDir.create(recursive: true);
       }
@@ -46,13 +62,20 @@ class RecordingRepositoryImpl implements RecordingRepository {
       final fileName = 'recording_${_uuid.v4()}.m4a';
       final filePath = '${recordingsDir.path}/$fileName';
 
-      // Start recording
-      await _audioRecorder.start(
-        path: filePath,
-        encoder: AudioEncoder.aacLc,
-        bitRate: 128000,
-        samplingRate: 44100,
-      );
+      // Use audio_waveforms on mobile, record package on desktop
+      if (Platform.isIOS || Platform.isAndroid) {
+        if (_recorderController == null) {
+          return const Left(UnknownFailure('Recorder controller not set'));
+        }
+        await _recorderController!.record(path: filePath);
+      } else {
+        await _audioRecorder.start(
+          path: filePath,
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          samplingRate: 44100,
+        );
+      }
 
       _currentRecordingPath = filePath;
       _recordingStartTime = DateTime.now();
@@ -66,7 +89,14 @@ class RecordingRepositoryImpl implements RecordingRepository {
   @override
   Future<Either<Failure, void>> pauseRecording() async {
     try {
-      await _audioRecorder.pause();
+      if (Platform.isIOS || Platform.isAndroid) {
+        if (_recorderController == null) {
+          return const Left(UnknownFailure('Recorder controller not set'));
+        }
+        await _recorderController!.pause();
+      } else {
+        await _audioRecorder.pause();
+      }
       return const Right(null);
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
@@ -76,7 +106,14 @@ class RecordingRepositoryImpl implements RecordingRepository {
   @override
   Future<Either<Failure, void>> resumeRecording() async {
     try {
-      await _audioRecorder.resume();
+      if (Platform.isIOS || Platform.isAndroid) {
+        if (_recorderController == null) {
+          return const Left(UnknownFailure('Recorder controller not set'));
+        }
+        await _recorderController!.record();
+      } else {
+        await _audioRecorder.resume();
+      }
       return const Right(null);
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
@@ -86,8 +123,17 @@ class RecordingRepositoryImpl implements RecordingRepository {
   @override
   Future<Either<Failure, VoiceRecording>> stopRecording() async {
     try {
-      final path = await _audioRecorder.stop();
-      
+      String? path;
+
+      if (Platform.isIOS || Platform.isAndroid) {
+        if (_recorderController == null) {
+          return const Left(UnknownFailure('Recorder controller not set'));
+        }
+        path = await _recorderController!.stop();
+      } else {
+        path = await _audioRecorder.stop();
+      }
+
       if (path == null) {
         return const Left(UnknownFailure('Failed to stop recording'));
       }
@@ -104,6 +150,7 @@ class RecordingRepositoryImpl implements RecordingRepository {
         id: _uuid.v4(),
         filePath: path,
         fileName: file.path.split('/').last,
+        title: null, // Will be set when user provides a name
         duration: duration,
         createdAt: DateTime.now(),
         fileSize: fileSize,
@@ -188,11 +235,20 @@ class RecordingRepositoryImpl implements RecordingRepository {
   @override
   Future<Either<Failure, void>> playRecording(String filePath) async {
     try {
-      await _audioPlayer.play(DeviceFileSource(filePath));
+      // Use UrlSource for remote URLs, DeviceFileSource for local files
+      if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        await _audioPlayer.play(UrlSource(filePath));
+      } else {
+        await _audioPlayer.play(DeviceFileSource(filePath));
+      }
       return const Right(null);
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
+  }
+
+  void setOnPlaybackComplete(void Function()? callback) {
+    _onPlaybackComplete = callback;
   }
 
   @override
@@ -217,12 +273,16 @@ class RecordingRepositoryImpl implements RecordingRepository {
 
   @override
   Future<bool> isRecording() async {
-    return await _audioRecorder.isRecording();
+    if (Platform.isIOS || Platform.isAndroid) {
+      return _recorderController?.isRecording ?? false;
+    } else {
+      return await _audioRecorder.isRecording();
+    }
   }
 
   @override
   Future<bool> isPlaying() async {
-    return _audioPlayer.state == PlayerState.playing;
+    return _audioPlayer.state == ap_interface.PlayerState.playing;
   }
 
   @override
@@ -238,6 +298,9 @@ class RecordingRepositoryImpl implements RecordingRepository {
 
   @override
   void dispose() {
+    if (Platform.isIOS || Platform.isAndroid) {
+      _recorderController?.dispose();
+    }
     _audioRecorder.dispose();
     _audioPlayer.dispose();
   }

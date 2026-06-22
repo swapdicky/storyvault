@@ -9,11 +9,13 @@ abstract class StoryRepository {
     required String localFilePath,
     required int duration,
     String? title,
+    String? transcript,
+    List<String>? tags,
   });
 
   Future<Either<Failure, List<Story>>> getUserStories(String userId);
-  
+
   Future<Either<Failure, String>> getSignedUrl(String audioPath);
-  
+
   Future<Either<Failure, void>> deleteStory(String storyId);
 }

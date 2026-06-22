@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/recording.dart';
 import '../../domain/repositories/recording_repository.dart';
+import '../../data/repositories/recording_repository_impl.dart';
 import '../../../story/domain/repositories/story_repository.dart';
 import '../../../story/presentation/providers/story_providers.dart';
-import '../../../auth/presentation/providers/auth_providers.dart' show currentUserIdProvider;
+import '../../../auth/presentation/providers/auth_providers.dart' show currentUserIdProvider, currentUserEmailProvider;
 
 class RecordingNotifier extends StateNotifier<RecordingState> {
   final RecordingRepository _recordingRepository;
@@ -15,7 +16,12 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     this._storyRepository,
     this._ref,
   ) : super(const RecordingState()) {
-    _loadRecordings();
+    // Set up playback completion callback
+    if (_recordingRepository is RecordingRepositoryImpl) {
+      (_recordingRepository as RecordingRepositoryImpl).setOnPlaybackComplete(() {
+        state = state.copyWith(currentPlayingPath: null);
+      });
+    }
   }
 
   Future<void> _loadRecordings() async {
@@ -90,42 +96,48 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
           errorMessage: failure.message,
         );
       },
-      (recording) async {
-        // Upload to cloud
-        final userId = _ref.read(currentUserIdProvider);
-        if (userId != null) {
-          await _ref.read(storyNotifierProvider.notifier).uploadStory(
-            userId: userId,
-            localFilePath: recording.filePath,
-            duration: recording.duration,
+      (recording) {
+        // Don't auto-upload, let user provide title first
+        // Hide recordings shorter than 1 second
+        if (recording.duration >= 1) {
+          final updatedRecordings = [recording, ...state.recordings];
+          state = state.copyWith(
+            isRecording: false,
+            isPaused: false,
+            isLoading: false,
+            recordings: updatedRecordings,
+          );
+        } else {
+          state = state.copyWith(
+            isRecording: false,
+            isPaused: false,
+            isLoading: false,
           );
         }
-        
-        final updatedRecordings = [recording, ...state.recordings];
-        state = state.copyWith(
-          isRecording: false,
-          isPaused: false,
-          isLoading: false,
-          recordings: updatedRecordings,
-        );
       },
     );
   }
 
-  Future<void> playRecording(String filePath) async {
-    state = state.copyWith(isPlaying: true, errorMessage: null);
-    
+  Future<void> playRecording(String filePath, {String? identifier}) async {
+    // Stop any current playback before starting new one
+    await stopPlayback();
+
+    // Use identifier if provided, otherwise use filePath
+    final playingIdentifier = identifier ?? filePath;
+
+    state = state.copyWith(currentPlayingPath: playingIdentifier, errorMessage: null);
+
     final result = await _recordingRepository.playRecording(filePath);
-    
+
     result.fold(
       (failure) {
         state = state.copyWith(
-          isPlaying: false,
+          currentPlayingPath: null,
           errorMessage: failure.message,
         );
       },
       (_) {
-        state = state.copyWith(isPlaying: true);
+        state = state.copyWith(currentPlayingPath: playingIdentifier);
       },
     );
   }
@@ -138,7 +150,7 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         state = state.copyWith(errorMessage: failure.message);
       },
       (_) {
-        state = state.copyWith(isPlaying: false, isPlaybackPaused: true);
+        state = state.copyWith(currentPlayingPath: null, isPlaybackPaused: true);
       },
     );
   }
@@ -151,7 +163,7 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         state = state.copyWith(errorMessage: failure.message);
       },
       (_) {
-        state = state.copyWith(isPlaying: false, isPlaybackPaused: false);
+        state = state.copyWith(currentPlayingPath: null, isPlaybackPaused: false);
       },
     );
   }
@@ -178,6 +190,42 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     );
   }
 
+  Future<void> uploadRecording(String recordingId, String title, {String? transcript, List<String>? tags}) async {
+    final recording = state.recordings.firstWhere((r) => r.id == recordingId);
+
+    // Update the recording with the title before uploading
+    final updatedRecording = VoiceRecording(
+      id: recording.id,
+      filePath: recording.filePath,
+      fileName: recording.fileName,
+      title: title,
+      duration: recording.duration,
+      createdAt: recording.createdAt,
+      fileSize: recording.fileSize,
+    );
+
+    final updatedRecordings = state.recordings.map((r) =>
+      r.id == recordingId ? updatedRecording : r
+    ).toList();
+    state = state.copyWith(recordings: updatedRecordings);
+
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId != null) {
+      await _ref.read(storyNotifierProvider.notifier).uploadStory(
+        userId: userId,
+        localFilePath: recording.filePath,
+        duration: recording.duration,
+        title: title,
+        transcript: transcript,
+        tags: tags,
+      );
+
+      // Remove from local recordings after upload attempt
+      final finalRecordings = state.recordings.where((r) => r.id != recordingId).toList();
+      state = state.copyWith(recordings: finalRecordings);
+    }
+  }
+
   void clearError() {
     state = state.copyWith(errorMessage: null);
   }
@@ -193,7 +241,7 @@ class RecordingState {
   final List<VoiceRecording> recordings;
   final bool isRecording;
   final bool isPaused;
-  final bool isPlaying;
+  final String? currentPlayingPath;
   final bool isPlaybackPaused;
   final bool isLoading;
   final String? errorMessage;
@@ -202,7 +250,7 @@ class RecordingState {
     this.recordings = const [],
     this.isRecording = false,
     this.isPaused = false,
-    this.isPlaying = false,
+    this.currentPlayingPath,
     this.isPlaybackPaused = false,
     this.isLoading = false,
     this.errorMessage,
@@ -212,7 +260,7 @@ class RecordingState {
     List<VoiceRecording>? recordings,
     bool? isRecording,
     bool? isPaused,
-    bool? isPlaying,
+    String? currentPlayingPath,
     bool? isPlaybackPaused,
     bool? isLoading,
     String? errorMessage,
@@ -221,7 +269,7 @@ class RecordingState {
       recordings: recordings ?? this.recordings,
       isRecording: isRecording ?? this.isRecording,
       isPaused: isPaused ?? this.isPaused,
-      isPlaying: isPlaying ?? this.isPlaying,
+      currentPlayingPath: currentPlayingPath ?? this.currentPlayingPath,
       isPlaybackPaused: isPlaybackPaused ?? this.isPlaybackPaused,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,

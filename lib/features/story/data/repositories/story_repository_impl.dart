@@ -22,6 +22,8 @@ class StoryRepositoryImpl implements StoryRepository {
     required String localFilePath,
     required int duration,
     String? title,
+    String? transcript,
+    List<String>? tags,
   }) async {
     try {
       final file = File(localFilePath);
@@ -40,16 +42,19 @@ class StoryRepositoryImpl implements StoryRepository {
         fileBytes,
       );
 
-      // Get public URL
-      final audioPath = _supabase.storage.from('recordings').getPublicUrl(storagePath);
-
-      // Insert metadata into database
+      // Insert metadata into database with storage path
       final response = await _supabase.from('stories').insert({
         'user_id': userId,
         'title': title,
-        'audio_path': audioPath,
+        'audio_path': storagePath,
         'duration': duration,
+        'transcript': transcript,
       }).select().single();
+
+      // Handle tags if provided
+      if (tags != null && tags.isNotEmpty) {
+        await _addTagsToStory(response['id'], tags);
+      }
 
       final story = Story(
         id: response['id'],
@@ -59,6 +64,8 @@ class StoryRepositoryImpl implements StoryRepository {
         duration: response['duration'],
         createdAt: DateTime.parse(response['created_at']),
         updatedAt: DateTime.parse(response['updated_at']),
+        transcript: response['transcript'],
+        tags: tags ?? [],
       );
 
       return Right(story);
@@ -72,11 +79,15 @@ class StoryRepositoryImpl implements StoryRepository {
     try {
       final response = await _supabase
           .from('stories')
-          .select()
+          .select('*, tags(name)')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
       final stories = response.map<Story>((data) {
+        final tagNames = (data['tags'] as List<dynamic>?)
+            ?.map((tag) => tag['name'] as String)
+            .toList() ?? [];
+
         return Story(
           id: data['id'],
           userId: data['user_id'],
@@ -85,6 +96,8 @@ class StoryRepositoryImpl implements StoryRepository {
           duration: data['duration'],
           createdAt: DateTime.parse(data['created_at']),
           updatedAt: DateTime.parse(data['updated_at']),
+          transcript: data['transcript'],
+          tags: tagNames,
         );
       }).toList();
 
@@ -97,14 +110,10 @@ class StoryRepositoryImpl implements StoryRepository {
   @override
   Future<Either<Failure, String>> getSignedUrl(String audioPath) async {
     try {
-      // Extract storage path from public URL
-      final uri = Uri.parse(audioPath);
-      final pathParts = uri.pathSegments;
-      final storagePath = pathParts.skip(1).join('/');
-
+      // audioPath is now the storage path directly (e.g., "userId/filename.m4a")
       final signedUrl = await _supabase.storage
           .from('recordings')
-          .createSignedUrl(storagePath, 3600); // 1 hour expiry
+          .createSignedUrl(audioPath, 3600); // 1 hour expiry
 
       return Right(signedUrl);
     } catch (e) {
@@ -124,13 +133,9 @@ class StoryRepositoryImpl implements StoryRepository {
 
       final audioPath = response['audio_path'];
 
-      // Extract storage path from public URL
-      final uri = Uri.parse(audioPath);
-      final pathParts = uri.pathSegments;
-      final storagePath = pathParts.skip(1).join('/');
-
+      // audioPath is now the storage path directly
       // Delete from storage
-      await _supabase.storage.from('recordings').remove([storagePath]);
+      await _supabase.storage.from('recordings').remove([audioPath]);
 
       // Delete from database
       await _supabase.from('stories').delete().eq('id', storyId);
@@ -138,6 +143,37 @@ class StoryRepositoryImpl implements StoryRepository {
       return const Right(null);
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  Future<void> _addTagsToStory(String storyId, List<String> tagNames) async {
+    for (final tagName in tagNames) {
+      // Check if tag already exists
+      final existingTag = await _supabase
+          .from('tags')
+          .select()
+          .eq('name', tagName)
+          .maybeSingle();
+
+      String tagId;
+
+      if (existingTag == null) {
+        // Create new tag
+        final newTag = await _supabase
+            .from('tags')
+            .insert({'name': tagName})
+            .select()
+            .single();
+        tagId = newTag['id'];
+      } else {
+        tagId = existingTag['id'];
+      }
+
+      // Link tag to story
+      await _supabase.from('story_tags').insert({
+        'story_id': storyId,
+        'tag_id': tagId,
+      });
     }
   }
 }

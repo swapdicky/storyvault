@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import '../../data/repositories/recording_repository_impl.dart';
 import '../../domain/repositories/recording_repository.dart';
 import '../../domain/entities/recording.dart';
@@ -6,9 +7,18 @@ import '../notifiers/recording_notifier.dart';
 import '../../../story/data/repositories/story_repository_impl.dart';
 import '../../../story/domain/repositories/story_repository.dart';
 
+// Recorder Controller Provider
+final recorderControllerProvider = Provider<RecorderController>((ref) {
+  final controller = RecorderController();
+  ref.onDispose(() => controller.dispose());
+  return controller;
+});
+
 // Recording Repository Provider
 final recordingRepositoryProvider = Provider<RecordingRepository>((ref) {
-  return RecordingRepositoryImpl();
+  return RecordingRepositoryImpl(
+    recorderController: ref.watch(recorderControllerProvider),
+  );
 });
 
 // Story Repository Provider
@@ -38,8 +48,8 @@ final isPausedProvider = Provider<bool>((ref) {
   return ref.watch(recordingNotifierProvider).isPaused;
 });
 
-final isPlayingProvider = Provider<bool>((ref) {
-  return ref.watch(recordingNotifierProvider).isPlaying;
+final currentPlayingPathProvider = Provider<String?>((ref) {
+  return ref.watch(recordingNotifierProvider).currentPlayingPath;
 });
 
 final isPlaybackPausedProvider = Provider<bool>((ref) {

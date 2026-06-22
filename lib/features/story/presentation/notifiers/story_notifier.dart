@@ -12,6 +12,8 @@ class StoryNotifier extends StateNotifier<StoryState> {
     required String localFilePath,
     required int duration,
     String? title,
+    String? transcript,
+    List<String>? tags,
   }) async {
     state = state.copyWith(isUploading: true, errorMessage: null);
 
@@ -20,6 +22,8 @@ class StoryNotifier extends StateNotifier<StoryState> {
       localFilePath: localFilePath,
       duration: duration,
       title: title,
+      transcript: transcript,
+      tags: tags,
     );
 
     result.fold(
@@ -79,6 +83,17 @@ class StoryNotifier extends StateNotifier<StoryState> {
           stories: updatedStories,
         );
       },
+    );
+  }
+
+  Future<String?> getSignedUrl(String audioPath) async {
+    final result = await _storyRepository.getSignedUrl(audioPath);
+    return result.fold(
+      (failure) {
+        state = state.copyWith(errorMessage: failure.message);
+        return null;
+      },
+      (url) => url,
     );
   }
 
