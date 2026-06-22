@@ -65,11 +65,11 @@ class _EditStoryScreenState extends ConsumerState<EditStoryScreen> {
                         _tagsController.text.trim(),
                       );
                       if (mounted) {
-                        Navigator.pop(context);
+                        Navigator.of(context).pop();
                       }
                     } catch (e) {
-                      setState(() => _isSaving = false);
                       if (mounted) {
+                        setState(() => _isSaving = false);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Save failed: ${e.toString()}')),
                         );
