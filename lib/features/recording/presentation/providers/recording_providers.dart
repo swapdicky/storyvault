@@ -63,3 +63,7 @@ final recordingLoadingProvider = Provider<bool>((ref) {
 final recordingErrorProvider = Provider<String?>((ref) {
   return ref.watch(recordingNotifierProvider).errorMessage;
 });
+
+final uploadingRecordingIdsProvider = Provider<Set<String>>((ref) {
+  return ref.watch(recordingNotifierProvider).uploadingRecordingIds;
+});

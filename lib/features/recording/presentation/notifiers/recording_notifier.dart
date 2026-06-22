@@ -100,13 +100,23 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         // Don't auto-upload, let user provide title first
         // Hide recordings shorter than 1 second
         if (recording.duration >= 1) {
-          final updatedRecordings = [recording, ...state.recordings];
-          state = state.copyWith(
-            isRecording: false,
-            isPaused: false,
-            isLoading: false,
-            recordings: updatedRecordings,
-          );
+          // Prevent duplicate recordings by checking file path
+          final isDuplicate = state.recordings.any((r) => r.filePath == recording.filePath);
+          if (!isDuplicate) {
+            final updatedRecordings = [recording, ...state.recordings];
+            state = state.copyWith(
+              isRecording: false,
+              isPaused: false,
+              isLoading: false,
+              recordings: updatedRecordings,
+            );
+          } else {
+            state = state.copyWith(
+              isRecording: false,
+              isPaused: false,
+              isLoading: false,
+            );
+          }
         } else {
           state = state.copyWith(
             isRecording: false,
@@ -193,6 +203,9 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
   Future<void> uploadRecording(String recordingId, String title, {String? transcript, List<String>? tags}) async {
     final recording = state.recordings.firstWhere((r) => r.id == recordingId);
 
+    // Mark recording as uploading
+    state = state.copyWith(uploadingRecordingIds: {...state.uploadingRecordingIds, recordingId});
+
     // Update the recording with the title before uploading
     final updatedRecording = VoiceRecording(
       id: recording.id,
@@ -222,7 +235,12 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
 
       // Remove from local recordings after upload attempt
       final finalRecordings = state.recordings.where((r) => r.id != recordingId).toList();
-      state = state.copyWith(recordings: finalRecordings);
+      final finalUploadingIds = state.uploadingRecordingIds.where((id) => id != recordingId).toSet();
+      state = state.copyWith(recordings: finalRecordings, uploadingRecordingIds: finalUploadingIds);
+    } else {
+      // Remove from uploading set if no user
+      final finalUploadingIds = state.uploadingRecordingIds.where((id) => id != recordingId).toSet();
+      state = state.copyWith(uploadingRecordingIds: finalUploadingIds);
     }
   }
 
@@ -245,6 +263,7 @@ class RecordingState {
   final bool isPlaybackPaused;
   final bool isLoading;
   final String? errorMessage;
+  final Set<String> uploadingRecordingIds;
 
   const RecordingState({
     this.recordings = const [],
@@ -254,6 +273,7 @@ class RecordingState {
     this.isPlaybackPaused = false,
     this.isLoading = false,
     this.errorMessage,
+    this.uploadingRecordingIds = const {},
   });
 
   RecordingState copyWith({
@@ -264,6 +284,7 @@ class RecordingState {
     bool? isPlaybackPaused,
     bool? isLoading,
     String? errorMessage,
+    Set<String>? uploadingRecordingIds,
   }) {
     return RecordingState(
       recordings: recordings ?? this.recordings,
@@ -273,6 +294,7 @@ class RecordingState {
       isPlaybackPaused: isPlaybackPaused ?? this.isPlaybackPaused,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
+      uploadingRecordingIds: uploadingRecordingIds ?? this.uploadingRecordingIds,
     );
   }
 }

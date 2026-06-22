@@ -43,7 +43,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     final isPaused = ref.watch(isPausedProvider);
     final stories = ref.watch(storiesProvider);
     final recordings = ref.watch(recordingsProvider);
-    final isUploading = ref.watch(storyUploadingProvider);
+    final uploadingRecordingIds = ref.watch(uploadingRecordingIdsProvider);
     final errorMessage = ref.watch(recordingErrorProvider) ?? ref.watch(storyErrorProvider);
 
     return Scaffold(
@@ -72,8 +72,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                     SizedBox(
                       height: 50,
                       child: AudioWaveforms(
-                        size: Size(MediaQuery.of(context).size.width - 100, 50),
+                        size: Size(MediaQuery.of(context).size.width - 32, 50),
                         recorderController: _recorderController,
+                        enableRecorder: true,
                         waveStyle: const WaveStyle(
                           waveColor: Colors.red,
                           extendWaveform: true,
@@ -101,61 +102,52 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                       ),
                     ),
                   const SizedBox(height: 48),
-                  if (isUploading)
-                    const Column(
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Uploading to cloud...'),
-                      ],
-                    )
-                  else
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (isRecording)
-                          IconButton(
-                            onPressed: () {
-                              if (isPaused) {
-                                ref.read(recordingNotifierProvider.notifier).resumeRecording();
-                              } else {
-                                ref.read(recordingNotifierProvider.notifier).pauseRecording();
-                              }
-                            },
-                            icon: Icon(
-                              isPaused ? Icons.play_arrow : Icons.pause,
-                              size: 36,
-                            ),
-                          ),
-                        const SizedBox(width: 12),
-                        FloatingActionButton(
-                          onPressed: isUploading ? null : () {
-                            if (isRecording) {
-                              ref.read(recordingNotifierProvider.notifier).stopRecording();
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isRecording)
+                        IconButton(
+                          onPressed: () {
+                            if (isPaused) {
+                              ref.read(recordingNotifierProvider.notifier).resumeRecording();
                             } else {
-                              ref.read(recordingNotifierProvider.notifier).startRecording();
+                              ref.read(recordingNotifierProvider.notifier).pauseRecording();
                             }
                           },
-                          child: Icon(
-                            isRecording ? Icons.stop : Icons.mic,
-                            size: 28,
+                          icon: Icon(
+                            isPaused ? Icons.play_arrow : Icons.pause,
+                            size: 36,
                           ),
-                          mini: true,
-                          backgroundColor: isRecording ? Colors.red : null,
                         ),
-                        const SizedBox(width: 12),
-                        if (isRecording)
-                          IconButton(
-                            onPressed: () {
-                              ref.read(recordingNotifierProvider.notifier).stopRecording();
-                            },
-                            icon: const Icon(
-                              Icons.stop,
-                              size: 36,
-                            ),
+                      const SizedBox(width: 12),
+                      FloatingActionButton(
+                        onPressed: () {
+                          if (isRecording) {
+                            ref.read(recordingNotifierProvider.notifier).stopRecording();
+                          } else {
+                            ref.read(recordingNotifierProvider.notifier).startRecording();
+                          }
+                        },
+                        child: Icon(
+                          isRecording ? Icons.stop : Icons.mic,
+                          size: 28,
+                        ),
+                        mini: true,
+                        backgroundColor: isRecording ? Colors.red : null,
+                      ),
+                      const SizedBox(width: 12),
+                      if (isRecording)
+                        IconButton(
+                          onPressed: () {
+                            ref.read(recordingNotifierProvider.notifier).stopRecording();
+                          },
+                          icon: const Icon(
+                            Icons.stop,
+                            size: 36,
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -296,6 +288,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   Widget _buildListItem(BuildContext context, Map<String, dynamic> item, WidgetRef ref) {
     if (item['type'] == 'recording') {
       final recording = item['data'];
+      final isUploading = ref.watch(uploadingRecordingIdsProvider).contains(recording.id);
       return RecordingListItem(
         recording: recording,
         onPlay: () {
@@ -312,7 +305,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         onDelete: () {
           ref.read(recordingNotifierProvider.notifier).deleteRecording(recording.id);
         },
-        isUploading: ref.watch(storyUploadingProvider),
+        isUploading: isUploading,
       );
     } else {
       final story = item['data'];
@@ -394,10 +387,12 @@ class RecordingListItem extends ConsumerWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       recording.title ?? 'New Recording',
                       overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -407,10 +402,13 @@ class RecordingListItem extends ConsumerWidget {
                       children: [
                         const Icon(Icons.graphic_eq, size: 14),
                         const SizedBox(width: 4),
-                        Text(
-                          _formatSecondsToDuration(recording.duration),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        Flexible(
+                          child: Text(
+                            _formatSecondsToDuration(recording.duration),
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -421,10 +419,13 @@ class RecordingListItem extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          _formatDate(recording.createdAt),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        Flexible(
+                          child: Text(
+                            _formatDate(recording.createdAt),
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
                           ),
                         ),
                       ],
@@ -539,10 +540,12 @@ class StoryListItem extends ConsumerWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       story.title ?? 'Untitled Story',
                       overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -552,10 +555,13 @@ class StoryListItem extends ConsumerWidget {
                       children: [
                         const Icon(Icons.graphic_eq, size: 14),
                         const SizedBox(width: 4),
-                        Text(
-                          _formatDuration(story.duration),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        Flexible(
+                          child: Text(
+                            _formatDuration(story.duration),
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -566,10 +572,13 @@ class StoryListItem extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          _formatDate(story.createdAt),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        Flexible(
+                          child: Text(
+                            _formatDate(story.createdAt),
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
                           ),
                         ),
                       ],

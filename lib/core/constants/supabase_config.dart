@@ -8,3 +8,9 @@ class OpenAIConfig {
   // Replace with your actual OpenAI API key
   static const String apiKey = 'YOUR_OPENAI_API_KEY';
 }
+
+class OllamaConfig {
+  // Ollama endpoint for self-hosted AI
+  static const String endpoint = 'http://192.168.1.137:11434';
+  static const String model = 'phi3'; // Recommended model for edge devices
+}

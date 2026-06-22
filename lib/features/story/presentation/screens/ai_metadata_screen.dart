@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/ai_service.dart';
+import '../../../../core/services/ollama_service.dart';
 import '../../../../core/constants/supabase_config.dart';
 
 class AIMetadataScreen extends ConsumerStatefulWidget {
@@ -42,31 +42,24 @@ class _AIMetadataScreenState extends ConsumerState<AIMetadataScreen> {
     });
 
     try {
-      final aiService = AIService(apiKey: OpenAIConfig.apiKey);
+      final ollamaService = OllamaService();
 
-      // Transcribe audio
-      final transcriptResult = await aiService.transcribeAudio(widget.audioFilePath);
-      transcriptResult.fold(
+      // For now, we'll skip Whisper transcription and use a placeholder
+      // In production, you would integrate Whisper separately
+      setState(() => _transcript = 'Transcription will be added separately with Whisper integration.');
+
+      // Generate title suggestions using Ollama
+      final titleResult = await ollamaService.generateTitleSuggestions(_transcript!);
+      titleResult.fold(
         (failure) => setState(() => _error = failure.message),
-        (transcript) {
-          setState(() => _transcript = transcript);
+        (titles) => setState(() => _titleSuggestions = titles),
+      );
 
-          // Generate title suggestions
-          aiService.generateTitleSuggestions(transcript).then((result) {
-            result.fold(
-              (failure) => setState(() => _error = failure.message),
-              (titles) => setState(() => _titleSuggestions = titles),
-            );
-          });
-
-          // Generate tags
-          aiService.generateTags(transcript).then((result) {
-            result.fold(
-              (failure) => setState(() => _error = failure.message),
-              (tags) => setState(() => _tags = tags),
-            );
-          });
-        },
+      // Generate tags using Ollama
+      final tagResult = await ollamaService.generateTags(_transcript!);
+      tagResult.fold(
+        (failure) => setState(() => _error = failure.message),
+        (tags) => setState(() => _tags = tags),
       );
     } catch (e) {
       setState(() => _error = e.toString());

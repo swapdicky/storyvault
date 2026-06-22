@@ -146,11 +146,15 @@ class RecordingRepositoryImpl implements RecordingRepository {
       final fileSize = await file.length();
       final duration = DateTime.now().difference(_recordingStartTime ?? DateTime.now()).inSeconds;
 
+      // Auto-generate default title using date/time
+      final now = DateTime.now();
+      final defaultTitle = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
       final recording = VoiceRecording(
         id: _uuid.v4(),
         filePath: path,
         fileName: file.path.split('/').last,
-        title: null, // Will be set when user provides a name
+        title: defaultTitle,
         duration: duration,
         createdAt: DateTime.now(),
         fileSize: fileSize,
