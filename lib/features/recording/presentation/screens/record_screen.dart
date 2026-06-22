@@ -57,97 +57,99 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
             flex: 2,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    isRecording ? Icons.fiber_manual_record : Icons.mic,
-                    size: 64,
-                    color: isRecording
-                        ? Colors.red
-                        : Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 8),
-                  if (isRecording)
-                    SizedBox(
-                      height: 50,
-                      child: AudioWaveforms(
-                        size: Size(MediaQuery.of(context).size.width - 32, 50),
-                        recorderController: _recorderController,
-                        waveStyle: const WaveStyle(
-                          waveColor: Colors.red,
-                          extendWaveform: true,
-                          showMiddleLine: false,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isRecording ? Icons.fiber_manual_record : Icons.mic,
+                      size: 64,
+                      color: isRecording
+                          ? Colors.red
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 8),
+                    if (isRecording)
+                      SizedBox(
+                        height: 50,
+                        child: AudioWaveforms(
+                          size: Size(MediaQuery.of(context).size.width - 32, 50),
+                          recorderController: _recorderController,
+                          waveStyle: const WaveStyle(
+                            waveColor: Colors.red,
+                            extendWaveform: true,
+                            showMiddleLine: false,
+                          ),
                         ),
                       ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isRecording
+                          ? (isPaused ? 'Recording Paused' : 'Recording...')
+                          : 'Record Your Story',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  const SizedBox(height: 8),
-                  Text(
-                    isRecording
-                        ? (isPaused ? 'Recording Paused' : 'Recording...')
-                        : 'Record Your Story',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  if (errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                    const SizedBox(height: 12),
+                    if (errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          errorMessage!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  const SizedBox(height: 48),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (isRecording)
-                        IconButton(
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (isRecording)
+                          IconButton(
+                            onPressed: () {
+                              if (isPaused) {
+                                ref.read(recordingNotifierProvider.notifier).resumeRecording();
+                              } else {
+                                ref.read(recordingNotifierProvider.notifier).pauseRecording();
+                              }
+                            },
+                            icon: Icon(
+                              isPaused ? Icons.play_arrow : Icons.pause,
+                              size: 36,
+                            ),
+                          ),
+                        const SizedBox(width: 12),
+                        FloatingActionButton(
                           onPressed: () {
-                            if (isPaused) {
-                              ref.read(recordingNotifierProvider.notifier).resumeRecording();
+                            if (isRecording) {
+                              ref.read(recordingNotifierProvider.notifier).stopRecording();
                             } else {
-                              ref.read(recordingNotifierProvider.notifier).pauseRecording();
+                              ref.read(recordingNotifierProvider.notifier).startRecording();
                             }
                           },
-                          icon: Icon(
-                            isPaused ? Icons.play_arrow : Icons.pause,
-                            size: 36,
+                          child: Icon(
+                            isRecording ? Icons.stop : Icons.mic,
+                            size: 28,
                           ),
+                          mini: true,
+                          backgroundColor: isRecording ? Colors.red : null,
                         ),
-                      const SizedBox(width: 12),
-                      FloatingActionButton(
-                        onPressed: () {
-                          if (isRecording) {
-                            ref.read(recordingNotifierProvider.notifier).stopRecording();
-                          } else {
-                            ref.read(recordingNotifierProvider.notifier).startRecording();
-                          }
-                        },
-                        child: Icon(
-                          isRecording ? Icons.stop : Icons.mic,
-                          size: 28,
-                        ),
-                        mini: true,
-                        backgroundColor: isRecording ? Colors.red : null,
-                      ),
-                      const SizedBox(width: 12),
-                      if (isRecording)
-                        IconButton(
-                          onPressed: () {
-                            ref.read(recordingNotifierProvider.notifier).stopRecording();
-                          },
-                          icon: const Icon(
-                            Icons.stop,
-                            size: 36,
+                        const SizedBox(width: 12),
+                        if (isRecording)
+                          IconButton(
+                            onPressed: () {
+                              ref.read(recordingNotifierProvider.notifier).stopRecording();
+                            },
+                            icon: const Icon(
+                              Icons.stop,
+                              size: 36,
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
