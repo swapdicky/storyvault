@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class EditStoryScreen extends ConsumerStatefulWidget {
   final String audioFilePath;
   final String defaultTitle;
-  final Function(String title, String transcript, String tags) onSave;
+  final Future<void> Function(String title, String transcript, String tags) onSave;
 
   const EditStoryScreen({
     super.key,
@@ -21,6 +21,7 @@ class _EditStoryScreenState extends ConsumerState<EditStoryScreen> {
   late TextEditingController _titleController;
   late TextEditingController _transcriptController;
   late TextEditingController _tagsController;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -44,17 +45,38 @@ class _EditStoryScreenState extends ConsumerState<EditStoryScreen> {
       appBar: AppBar(
         title: const Text('Edit Story'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: () {
-              widget.onSave(
-                _titleController.text.trim(),
-                _transcriptController.text.trim(),
-                _tagsController.text.trim(),
-              );
-              Navigator.pop(context);
-            },
-          ),
+          _isSaving
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.check),
+                  onPressed: () async {
+                    setState(() => _isSaving = true);
+                    try {
+                      await widget.onSave(
+                        _titleController.text.trim(),
+                        _transcriptController.text.trim(),
+                        _tagsController.text.trim(),
+                      );
+                      if (mounted) {
+                        Navigator.pop(context);
+                      }
+                    } catch (e) {
+                      setState(() => _isSaving = false);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Save failed: ${e.toString()}')),
+                        );
+                      }
+                    }
+                  },
+                ),
         ],
       ),
       body: SingleChildScrollView(

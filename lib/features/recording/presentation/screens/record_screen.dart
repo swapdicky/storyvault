@@ -199,15 +199,14 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         builder: (context) => EditStoryScreen(
           audioFilePath: recording.filePath,
           defaultTitle: defaultTitle,
-          onSave: (title, transcript, tags) {
+          onSave: (title, transcript, tags) async {
             // Store tags in transcript field for now (comma-separated)
             final fullTranscript = tags.isNotEmpty ? '$transcript\n\nTags: $tags' : transcript;
-            ref.read(recordingNotifierProvider.notifier).uploadRecording(
+            await ref.read(recordingNotifierProvider.notifier).uploadRecording(
               recordingId,
               title,
               transcript: fullTranscript,
             );
-            Navigator.pop(context);
           },
         ),
       ),

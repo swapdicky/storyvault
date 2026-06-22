@@ -336,14 +336,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
-  intl:
-    dependency: transitive
-    description:
-      name: intl
-      sha256: "910f85bce16fb5c6f614e117efa303e85a1731bb0081edf3604a2ae6e9a3cc91"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.17.0"
   jni:
     dependency: transitive
     description:
@@ -456,14 +448,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "9.4.1"
-  openai:
-    dependency: "direct main"
-    description:
-      name: openai
-      sha256: "60ca5e83af6718f6bb306ea1f2f5dc968ecce375ebc45a5462554ece43067250"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.0"
   package_config:
     dependency: transitive
     description:

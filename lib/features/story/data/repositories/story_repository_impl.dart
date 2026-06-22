@@ -41,14 +41,21 @@ class StoryRepositoryImpl implements StoryRepository {
         fileBytes,
       );
 
-      // Insert metadata into database with storage path
-      final response = await _supabase.from('stories').insert({
+      // Build insert data - only include transcript if it's not null and not empty
+      final insertData = <String, dynamic>{
         'user_id': userId,
         'title': title,
         'audio_path': storagePath,
         'duration': duration,
-        'transcript': transcript,
-      }).select().single();
+      };
+
+      // Only add transcript if it exists and is not empty
+      if (transcript != null && transcript.isNotEmpty) {
+        insertData['transcript'] = transcript;
+      }
+
+      // Insert metadata into database with storage path
+      final response = await _supabase.from('stories').insert(insertData).select().single();
 
       final story = Story(
         id: response['id'],
@@ -63,7 +70,7 @@ class StoryRepositoryImpl implements StoryRepository {
 
       return Right(story);
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(UnknownFailure('Upload failed: ${e.toString()}'));
     }
   }
 

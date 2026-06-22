@@ -201,45 +201,54 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
   }
 
   Future<void> uploadRecording(String recordingId, String title, {String? transcript}) async {
-    final recording = state.recordings.firstWhere((r) => r.id == recordingId);
+    try {
+      final recording = state.recordings.firstWhere((r) => r.id == recordingId);
 
-    // Mark recording as uploading
-    state = state.copyWith(uploadingRecordingIds: {...state.uploadingRecordingIds, recordingId});
+      // Mark recording as uploading
+      state = state.copyWith(uploadingRecordingIds: {...state.uploadingRecordingIds, recordingId});
 
-    // Update the recording with the title before uploading
-    final updatedRecording = VoiceRecording(
-      id: recording.id,
-      filePath: recording.filePath,
-      fileName: recording.fileName,
-      title: title,
-      duration: recording.duration,
-      createdAt: recording.createdAt,
-      fileSize: recording.fileSize,
-    );
-
-    final updatedRecordings = state.recordings.map((r) =>
-      r.id == recordingId ? updatedRecording : r
-    ).toList();
-    state = state.copyWith(recordings: updatedRecordings);
-
-    final userId = _ref.read(currentUserIdProvider);
-    if (userId != null) {
-      await _ref.read(storyNotifierProvider.notifier).uploadStory(
-        userId: userId,
-        localFilePath: recording.filePath,
-        duration: recording.duration,
+      // Update the recording with the title before uploading
+      final updatedRecording = VoiceRecording(
+        id: recording.id,
+        filePath: recording.filePath,
+        fileName: recording.fileName,
         title: title,
-        transcript: transcript,
+        duration: recording.duration,
+        createdAt: recording.createdAt,
+        fileSize: recording.fileSize,
       );
 
-      // Remove from local recordings after upload attempt
-      final finalRecordings = state.recordings.where((r) => r.id != recordingId).toList();
+      final updatedRecordings = state.recordings.map((r) =>
+        r.id == recordingId ? updatedRecording : r
+      ).toList();
+      state = state.copyWith(recordings: updatedRecordings);
+
+      final userId = _ref.read(currentUserIdProvider);
+      if (userId != null) {
+        await _ref.read(storyNotifierProvider.notifier).uploadStory(
+          userId: userId,
+          localFilePath: recording.filePath,
+          duration: recording.duration,
+          title: title,
+          transcript: transcript,
+        );
+
+        // Remove from local recordings after upload attempt
+        final finalRecordings = state.recordings.where((r) => r.id != recordingId).toList();
+        final finalUploadingIds = state.uploadingRecordingIds.where((id) => id != recordingId).toSet();
+        state = state.copyWith(recordings: finalRecordings, uploadingRecordingIds: finalUploadingIds);
+      } else {
+        // Remove from uploading set if no user
+        final finalUploadingIds = state.uploadingRecordingIds.where((id) => id != recordingId).toSet();
+        state = state.copyWith(uploadingRecordingIds: finalUploadingIds);
+      }
+    } catch (e) {
+      // Remove from uploading set on error
       final finalUploadingIds = state.uploadingRecordingIds.where((id) => id != recordingId).toSet();
-      state = state.copyWith(recordings: finalRecordings, uploadingRecordingIds: finalUploadingIds);
-    } else {
-      // Remove from uploading set if no user
-      final finalUploadingIds = state.uploadingRecordingIds.where((id) => id != recordingId).toSet();
-      state = state.copyWith(uploadingRecordingIds: finalUploadingIds);
+      state = state.copyWith(
+        uploadingRecordingIds: finalUploadingIds,
+        errorMessage: 'Upload failed: ${e.toString()}',
+      );
     }
   }
 
