@@ -74,7 +74,6 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                       child: AudioWaveforms(
                         size: Size(MediaQuery.of(context).size.width - 32, 50),
                         recorderController: _recorderController,
-                        enableRecorder: true,
                         waveStyle: const WaveStyle(
                           waveColor: Colors.red,
                           extendWaveform: true,

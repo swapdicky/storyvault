@@ -61,12 +61,20 @@ Titles:''',
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'model': model,
-          'prompt': '''Generate 3-8 relevant tags for this personal story transcript. Tags should be short, descriptive, and start with #. Return only the tags, one per line, without any additional text or numbering.
+          'prompt': '''Extract only concrete keywords from this story transcript.
+
+Rules:
+- 3 to 6 tags maximum
+- Single words or short phrases
+- Use names, people, places, activities, events
+- Avoid abstract concepts
+- Avoid emotional labels
+- Output only keywords, one per line
 
 Transcript:
 $transcript
 
-Tags:''',
+Keywords:''',
           'stream': false,
           'options': {
             'temperature': 0.7,
@@ -82,6 +90,7 @@ Tags:''',
             .split('\n')
             .map((t) => t.trim())
             .where((t) => t.isNotEmpty)
+            .take(6)
             .toList();
 
         return Right(tags);
