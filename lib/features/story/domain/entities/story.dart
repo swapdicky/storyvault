@@ -9,7 +9,6 @@ class Story extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? transcript;
-  final List<String> tags;
 
   const Story({
     required this.id,
@@ -20,11 +19,10 @@ class Story extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     this.transcript,
-    this.tags = const [],
   });
 
   @override
-  List<Object?> get props => [id, userId, title, audioPath, duration, createdAt, updatedAt, transcript, tags];
+  List<Object?> get props => [id, userId, title, audioPath, duration, createdAt, updatedAt, transcript];
 
   Story copyWith({
     String? id,
@@ -35,7 +33,6 @@ class Story extends Equatable {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? transcript,
-    List<String>? tags,
   }) {
     return Story(
       id: id ?? this.id,
@@ -46,7 +43,6 @@ class Story extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       transcript: transcript ?? this.transcript,
-      tags: tags ?? this.tags,
     );
   }
 }

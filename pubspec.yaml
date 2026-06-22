@@ -63,9 +63,6 @@ dependencies:
   permission_handler: ^11.0.1
   audio_waveforms: ^2.0.2
 
-  # AI Services
-  openai: ^1.0.0
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

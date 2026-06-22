@@ -10,7 +10,6 @@ abstract class StoryRepository {
     required int duration,
     String? title,
     String? transcript,
-    List<String>? tags,
   });
 
   Future<Either<Failure, List<Story>>> getUserStories(String userId);

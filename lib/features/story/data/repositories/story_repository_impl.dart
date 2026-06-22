@@ -23,7 +23,6 @@ class StoryRepositoryImpl implements StoryRepository {
     required int duration,
     String? title,
     String? transcript,
-    List<String>? tags,
   }) async {
     try {
       final file = File(localFilePath);
@@ -51,11 +50,6 @@ class StoryRepositoryImpl implements StoryRepository {
         'transcript': transcript,
       }).select().single();
 
-      // Handle tags if provided
-      if (tags != null && tags.isNotEmpty) {
-        await _addTagsToStory(response['id'], tags);
-      }
-
       final story = Story(
         id: response['id'],
         userId: response['user_id'],
@@ -65,7 +59,6 @@ class StoryRepositoryImpl implements StoryRepository {
         createdAt: DateTime.parse(response['created_at']),
         updatedAt: DateTime.parse(response['updated_at']),
         transcript: response['transcript'],
-        tags: tags ?? [],
       );
 
       return Right(story);
@@ -79,16 +72,11 @@ class StoryRepositoryImpl implements StoryRepository {
     try {
       final response = await _supabase
           .from('stories')
-          .select('*, story_tags(tags(name))')
+          .select()
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
       final stories = response.map<Story>((data) {
-        final tagNames = (data['story_tags'] as List<dynamic>?)
-            ?.map((st) => st['tags'] as Map<String, dynamic>)
-            .map((tag) => tag['name'] as String)
-            .toList() ?? [];
-
         return Story(
           id: data['id'],
           userId: data['user_id'],
@@ -98,7 +86,6 @@ class StoryRepositoryImpl implements StoryRepository {
           createdAt: DateTime.parse(data['created_at']),
           updatedAt: DateTime.parse(data['updated_at']),
           transcript: data['transcript'],
-          tags: tagNames,
         );
       }).toList();
 
@@ -144,37 +131,6 @@ class StoryRepositoryImpl implements StoryRepository {
       return const Right(null);
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  Future<void> _addTagsToStory(String storyId, List<String> tagNames) async {
-    for (final tagName in tagNames) {
-      // Check if tag already exists
-      final existingTag = await _supabase
-          .from('tags')
-          .select()
-          .eq('name', tagName)
-          .maybeSingle();
-
-      String tagId;
-
-      if (existingTag == null) {
-        // Create new tag
-        final newTag = await _supabase
-            .from('tags')
-            .insert({'name': tagName})
-            .select()
-            .single();
-        tagId = newTag['id'];
-      } else {
-        tagId = existingTag['id'];
-      }
-
-      // Link tag to story
-      await _supabase.from('story_tags').insert({
-        'story_id': storyId,
-        'tag_id': tagId,
-      });
     }
   }
 }

@@ -4,7 +4,7 @@ import 'package:audio_waveforms/audio_waveforms.dart';
 import '../../../../shared/presentation/widgets/bottom_navigation.dart';
 import '../providers/recording_providers.dart';
 import '../../../story/presentation/providers/story_providers.dart';
-import '../../../story/presentation/screens/ai_metadata_screen.dart';
+import '../../../story/presentation/screens/edit_story_screen.dart';
 import '../../../auth/presentation/providers/auth_providers.dart' show currentUserIdProvider;
 
 class RecordScreen extends ConsumerStatefulWidget {
@@ -196,15 +196,16 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AIMetadataScreen(
+        builder: (context) => EditStoryScreen(
           audioFilePath: recording.filePath,
           defaultTitle: defaultTitle,
-          onConfirm: (title, tags, transcript) {
+          onSave: (title, transcript, tags) {
+            // Store tags in transcript field for now (comma-separated)
+            final fullTranscript = tags.isNotEmpty ? '$transcript\n\nTags: $tags' : transcript;
             ref.read(recordingNotifierProvider.notifier).uploadRecording(
               recordingId,
               title,
-              transcript: transcript,
-              tags: tags,
+              transcript: fullTranscript,
             );
             Navigator.pop(context);
           },

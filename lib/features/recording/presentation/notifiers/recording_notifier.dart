@@ -200,7 +200,7 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     );
   }
 
-  Future<void> uploadRecording(String recordingId, String title, {String? transcript, List<String>? tags}) async {
+  Future<void> uploadRecording(String recordingId, String title, {String? transcript}) async {
     final recording = state.recordings.firstWhere((r) => r.id == recordingId);
 
     // Mark recording as uploading
@@ -230,7 +230,6 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         duration: recording.duration,
         title: title,
         transcript: transcript,
-        tags: tags,
       );
 
       // Remove from local recordings after upload attempt

@@ -13,7 +13,6 @@ class StoryNotifier extends StateNotifier<StoryState> {
     required int duration,
     String? title,
     String? transcript,
-    List<String>? tags,
   }) async {
     state = state.copyWith(isUploading: true, errorMessage: null);
 
@@ -23,7 +22,6 @@ class StoryNotifier extends StateNotifier<StoryState> {
       duration: duration,
       title: title,
       transcript: transcript,
-      tags: tags,
     );
 
     result.fold(
